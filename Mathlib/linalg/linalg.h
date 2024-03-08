@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <iostream>
 
 
 // it does not have to be the most efficient implementation
@@ -27,7 +28,7 @@ class Matrix{
         size_t allocatedMemory;
 
         double determinant;
-        bool isInvertible;
+        int isInvertible;
         bool isSymmetric;
         bool isAntisymmetric;
         bool isInvertible;
@@ -45,19 +46,23 @@ class Matrix{
         bool operator== (const Matrix<T>& rhs); // declare the comparision operator and provide a value to test against, rhs
 
         template <class U> friend Matrix<U> operator+ (const Matrix<U>& lhs, const Matrix<U>& rhs); // add two matrices
-        template <class U> friend Matrix<U> operator* (Matrix<U>& lhs, Matrix<U> &rhs); // add two matrices
+        template <class U> friend Matrix<U> operator+ (Matrix<U>& lhs, Matrix<U> &rhs); // add two matrices
         template <class U> friend Matrix<U> operator+ (const U& lhs, const Matrix<U> &rhs); // add a matrix to a scalar
         template <class U> friend Matrix<U> operator+ (const Matrix<U> &lhs, const U& rhs); // add a scalar to a matrix
 
-        template <class U> friend Matrix<U> operator+ (const Matrix<U>& lhs, const Matrix<U>& rhs); // subtract two matrices
-        template <class U> friend Matrix<U> operator+ (const U& lhs, const Matrix<U> &rhs); // subtract a matrix from a scalar
-        template <class U> friend Matrix<U> operator+ (const Matrix<U> &lhs, const U& rhs); // subtract a scalar from a matrix
+        template <class U> friend Matrix<U> operator- (const Matrix<U>& lhs, const Matrix<U>& rhs); // subtract two matrices
+        template <class U> friend Matrix<U> operator- (Matrix<U>& lhs, Matrix<U> &rhs); 
+        template <class U> friend Matrix<U> operator- (const U& lhs, const Matrix<U> &rhs); // subtract a matrix from a scalar
+        template <class U> friend Matrix<U> operator- (const Matrix<U> &lhs, const U& rhs); // subtract a scalar from a matrix
 
-        template <class U> friend Matrix<U> operator+ (const Matrix<U>& lhs, const Matrix<U>& rhs); // multiply two matrices
-        template <class U> friend Matrix<U> operator+ (const U& lhs, const Matrix<U> &rhs); // linearly scale a matrix
-        template <class U> friend Matrix<U> operator+ (const Matrix<U> &lhs, const U& rhs); // ??
+        template <class U> friend Matrix<U> operator* (const Matrix<U>& lhs, const Matrix<U>& rhs); // multiply two matrices
+        template <class U> friend Matrix<U> operator* (Matrix<U>& lhs, Matrix<U> &rhs);
+        template <class U> friend Matrix<U> operator* (const U& lhs, const Matrix<U> &rhs); // linearly scale a matrix
+        template <class U> friend Matrix<U> operator* (const Matrix<U> &lhs, const U& rhs); // ??
         
         template <class U> friend U& operator[] (const Matrix<U> &target, int row, int col); // array indexing operation 
+
+        template <class U> friend ostream& operator<<(ostream& os, const Matrix<U> &output); // print matrix
 
 
         void setElement(int row, int col, T& value);
@@ -69,9 +74,11 @@ class Matrix{
         size_t getNumElements(){return this->nElements;}
         void swapRows(size_t r1, size_t r2);
         void swapCols(size_t c1, size_t c2);
+        int getInvertible();
         Matrix<T> invert();
         size_t findPivot(size_t r1, size_t r2, size_t loc);
-
+        void printMatrix();
+        void scaleRow(size_t r, T& mult);
         bool resize(size_t row, size_t col);
         bool resize(size_t row, size_t col, T& value);
         void setToIdentity();
@@ -89,10 +96,6 @@ class Matrix{
 // this is because anything that uses templating must be processed entirely in the include statements and thus must be in the header file 
 
 
-
-
-
-
 template <class T>
 Matrix<T>::Matrix(){
     // default constructor implementation 
@@ -100,6 +103,7 @@ Matrix<T>::Matrix(){
     this->nCols = 1;
     this->nElements = 1;
     this->data = new T(sizeof(T));
+    this->isInvertible = -1;
     data[0] = 0; // the code is meant to deal with primarily number types, so we assign a value of zero to 0d scalar
 }
 
@@ -109,6 +113,7 @@ Matrix<T>::Matrix(size_t rows, size_t cols){
     this->nCols = cols;
     this->nElements = rows*cols;
     this->data = new T(sizeof(T)*(this->nElements));
+    this->isInvertible = -1;
     for(int i = 0; i < this->nRows; i++){
         for(int j = 0; j < this->nCols; j++){
             MAT_AT(this->data, i, j, this->nCols) = 0;
@@ -122,6 +127,7 @@ Matrix<T>::Matrix(size_t rows, size_t cols, const T* inputvector){
     this->nCols = cols;
     this->nElements = rows*cols;
     this->data = new T(sizeof(T)*(this->nElements));
+    this->isInvertible = -1;
     for(int i = 0; i < this->nElements; i++) (this->data)[i] = inputvector[i];
     return;
 }
@@ -133,6 +139,7 @@ Matrix<T>::Matrix(Matrix<T>&m){
     this->nCols = m.getNumCols();
     this->nElements = m.getNumElements();
     this->data = new T(sizeof(T)*(this->nElements));
+    this->isInvertible = -1;
     for(int i = 0; i < this->nElements; i++) (this->data)[i] = m.getElement(i);
     return;
 }
@@ -144,6 +151,7 @@ Matrix<T>::Matrix(Matrix<T>* m){
     this->nCols = m->getNumCols();
     this->nElements = m->getNumElements();
     this->data = new T(sizeof(T)*(this->nElements));
+    this->isInvertible = -1;
     for(int i = 0; i < this->nElements; i++) (this->data)[i] = m->getElement(i);
     return;
 }
@@ -177,6 +185,13 @@ void Matrix<T>::setElement(int row, int col, T& value){
     int linearIndex = correctedRow*(this->nCols) + correctedCol;
     (this->data)[linearIndex] = value;
     return;
+}
+
+template <class T>
+int getInvertible(){
+    if(this->isInvertible != -1) return this->isInvertible;
+    Matrix<T> garbage = this->invert();
+    return this->isInvertible;     
 }
 
 
@@ -270,6 +285,9 @@ bool Matrix<T>::operator== (const Matrix <T> &rhs){
     return true;
 }
 
+
+// ADDITION OPERATOR + //
+
 template <class T>
 Matrix<T> operator+ (Matrix <T> &lhs, Matrix <T> &rhs){
     // adds one matrix to another and returns the result in a new matrix
@@ -280,11 +298,35 @@ Matrix<T> operator+ (Matrix <T> &lhs, Matrix <T> &rhs){
     return result;
 }
 
-// ADDITION OPERATOR + //
+template <class T>
+Matrix<T> operator+ (const Matrix <T> &lhs, const Matrix <T> &rhs){
+    // adds one matrix to another and returns the result in a new matrix
+    // since this is a friend function, it can access the private members of the class;
+    assert((a.nRows == b.nRows) && (a.nCols == b.nCols));
+    Matrix result(lhs);
+    for(int i = 0; i < a.nElements; i++) (result.data)[i] += (rhs.data)[i];
+    return result;
+}
 
 
 template <class T>
-Matrix<T> operator+ (T& lhs, Matrix <T> &rhs){
+void Matrix<T>::printMatrix(){
+    cout<<endl;
+    int rows = this->nRows;
+    int cols = this->nCols;
+    cout<<"Matrix Object of dimension "<<rows<<" by "<<cols<<endl;
+    cout<<"Matrix Data: "<<endl;
+    for(int i = 0; i < rows; i++){
+        for(int j = 0; j < cols; j++){
+            cout<<(this->data)[i*cols + j]<<" ";
+        }
+        cout<<endl;
+    }
+    return;
+}
+
+template <class T>
+Matrix<T> operator+ (const T& lhs, const Matrix <T> &rhs){
     // adds a constant value to every element of a matrix(rhs) and returns the result in a new matrix;
     Matrix result(rhs);
     for(int i = 0; i < rhs.nElements; i++) (result.data)[i] += lhs;
@@ -292,7 +334,7 @@ Matrix<T> operator+ (T& lhs, Matrix <T> &rhs){
 }
 
 template <class T>
-Matrix<T> operator+ (Matrix <T> &lhs, T& rhs){
+Matrix<T> operator+ (const Matrix <T> &lhs, const T& rhs){
     // adds 
     Matrix result(lhs);
     for(int i = 0; i < lhs.nElements; i++) (result.data)[i] += rhs;
@@ -302,7 +344,7 @@ Matrix<T> operator+ (Matrix <T> &lhs, T& rhs){
 // SUBTRACTION OPERATOR - //
 
 template <class T>
-Matrix<T> operator- (Matrix <T> &lhs, Matrix <T> &rhs){
+Matrix<T> operator- (const Matrix <T> &lhs, const Matrix <T> &rhs){
     assert((a.nRows == b.nRows) && (a.nCols == b.nCols));
     Matrix result(lhs);
     for(int i = 0; i < a.nElements; i++) (result.data)[i] -= (rhs.data)[i];
@@ -310,14 +352,14 @@ Matrix<T> operator- (Matrix <T> &lhs, Matrix <T> &rhs){
 }
 
 template <class T>
-Matrix<T> operator- (T& lhs, Matrix <T> &rhs){
+Matrix<T> operator- (const T& lhs, const Matrix <T> &rhs){
     Matrix result(rhs);
     for(int i = 0; i < rhs.nElements; i++) (result.data)[i] = lhs - (result.data)[i];
     return result;
 }
 
 template <class T>
-Matrix<T> operator- (Matrix <T> &lhs, T& rhs){
+Matrix<T> operator- (const Matrix <T> &lhs, const T& rhs){
     Matrix result(lhs);
     for(int i = 0; i < lhs.nElements; i++) (result.data)[i] -= rhs;
     return result;
@@ -326,7 +368,7 @@ Matrix<T> operator- (Matrix <T> &lhs, T& rhs){
 // MULTIPLICATION OPERATOR * //
 
 template <class T>
-Matrix<T> operator* (Matrix <T> &lhs, Matrix <T> &rhs){
+Matrix<T> operator* (const Matrix <T> &lhs, const Matrix <T> &rhs){
     // multiplication between two matrices
     assert((lhs.nCols == rhs.nRows));
     Matrix result(lhs.nRows, rhs.nCols);
@@ -348,7 +390,7 @@ Matrix<T> operator* (Matrix <T> &lhs, Matrix <T> &rhs){
 
 
 template <class T> 
-Matrix <T> operator* (T& lhs, Matrix<T>& rhs){
+Matrix <T> operator* (const T& lhs, const Matrix<T>& rhs){
     Matrix result(rhs);
     for(int i = 0; i < rhs.nElements; i++){
         (result.data)[i] *= lhs;
@@ -357,7 +399,7 @@ Matrix <T> operator* (T& lhs, Matrix<T>& rhs){
 }
 
 template <class T>
-Matrix<T> operator* (Matrix<T> &lhs, T& rhs){
+Matrix<T> operator* (const Matrix<T> &lhs, const T& rhs){
     Matrix result(lhs);
     for(int i = 0; i < lhs.nElements; i++) (result.data) *= rhs;
     return result;
@@ -365,7 +407,7 @@ Matrix<T> operator* (Matrix<T> &lhs, T& rhs){
 
 
 template <class T>
-Matrix<T> mulitply(const Matrix<T> &a, const Matrix<T> &b){
+Matrix<T> multiply(const Matrix<T> &a, const Matrix<T> &b){
     // performs element wise multiplication 
     assert((a.nRows == b.nRows) && (a.nCols == b.nCols));
     int elCount = a.nElements;
@@ -374,7 +416,7 @@ Matrix<T> mulitply(const Matrix<T> &a, const Matrix<T> &b){
         (result.data)[i] = (a.data)[i]*((b.data)[i]);
     }
 } 
-
+ 
 
 // GAUSSIAN ELIMINATION ///////////////////
 
@@ -420,13 +462,15 @@ size_t Matrix<T>::findPivot(size_t rs, size_t re, size_t loc){
 
 template <class T>
 Matrix<T> Matrix<T>::invert(){
+
     // this is a simple function that performs a matrix inversion
     // if at any point, we have a breakdown of elimination, we terminate and raise an error
     Matrix<T> inverse(this->nRows, this->nCols);
-    Matrix<T> temp(this->nRows, this->nCols);
-    for(int i = 0; i < n; i++){
-        temp.setElement();
+    if(this->nRows != this->nCols){
+        this->isInvertible = false;
+        return inverse;
     }
+    Matrix<T> temp(this);
     inverse.setToIdentity();
     // the elimination steps;
     /*
@@ -439,7 +483,7 @@ Matrix<T> Matrix<T>::invert(){
     int rows = this->nRows;
     int cols = this->nCols;
 
-    for(int i = 0; i < cols; i++){
+    for(int i = 0; i < rows; i++){
         // external loop evaulates all pivots
         // evaluate the status
         T p = (this->data)[i*cols + i]; 
@@ -447,12 +491,64 @@ Matrix<T> Matrix<T>::invert(){
             int index = findPivot(this, i + 1, this->nRows);
             if(index == -1){
                 inverse.setToIdentity();
+                this->isInvertible = false;
                 return inverse;
             }
+            temp.swapRows(i, index);
+            p = (this.data)[i*cols + i]; 
         }
-        for(int j = i + 1; j < cols; j++){
-            for(int k = )
+        for(int j = i + 1; j < rows; j++){
+            T multiplier = ((temp.data)[j*cols + i])/p;
+            for(int k = i; k < cols; k++){
+                (temp.data)[j*cols + k] -= ((temp.data)[i*cols + k])*multiplier;
+                if((temp.data)[j*cols+ k] < static_cast<T>(1e-9)) (temp.data)[j*cols + k] = static_cast<T>(0.0); // resolve floating point errors
+                (inverse.data)[j*cols + k] -= ((inverse.data)[i*cols + k])*multiplier;
+                if((inverse.data)[j*cols+ k] < static_cast<T>(1e-9)) (inverse.data)[j*cols + k] = static_cast<T>(0.0); // resolve floating point errors
+            }
+        }
+
+        // At this point standard Gaussian elimination is complete, and the resultant temp matrix can be used for solution of linear systems using back subst
+    }
+
+    // Now let us reduce the upper triangular matrix to the identity matrix 
+
+    for(int i = rows-1; i >= 0; i--){
+        T p = (temp.data)[i*cols + i];
+        // we don't need to worry about zero pivots, forward elimination would have spotted singularities
+        for(int j = i - 1; j >= 0; j--){
+            T multiplier = (temp.data)[j*cols + i]/p;
+            (temp.data)[j*cols + k] = static_cast<T>(0.0);
+            for(int k = i; k >= 0; k--){
+                (inverse.data)[j*cols + k] -= ((inverse.data)[i*cols + k])*multiplier;
+                if((inverse.data)[j*cols+ k] < static_cast<T>(1e-9)) (inverse.data)[j*cols + k] = static_cast<T>(0.0); // resolve floating point errors
+            }
         }
     }
 
+    // Normalize pivots
+
+    for(int i = 0; i < rows; i++){
+        (inverse.data)[i*cols + i] /= (temp.data)[i*cols + i];
+        (temp.data)[i*cols + i] = 1;
+    }
+
+    // At this point the matrix has been successfully inverted.
+
+    return inverse;
 }
+
+template <class T>
+void Matrix<T>::scaleRow(size_t row, T& mult){
+    // function to scale a row by a certain amount 
+    int cols = this->nCols;
+    for(int i = = 0; i < cols; i++){
+        (this->data)[row*cols + i] *= mult;
+    }
+    return;
+}
+
+
+
+
+
+
