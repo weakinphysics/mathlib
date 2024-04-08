@@ -21,7 +21,7 @@
 template <class T>
 
 class Ultimatrix{
-    private:
+    protected:
         T* data;
         size_t nRows;
         size_t nCols;
@@ -32,6 +32,7 @@ class Ultimatrix{
         int isInvertible;
         bool isSymmetric;
         bool isAntisymmetric;
+        bool isVector;
 
     public:
         // constructors
@@ -73,7 +74,6 @@ class Ultimatrix{
         void swapRows(size_t r1, size_t r2);
         void swapCols(size_t c1, size_t c2);
         int getInvertible();
-        Ultimatrix<T> invert();
         size_t findPivot(size_t r1, size_t r2, size_t loc);
         void printMatrix();
         void scaleRow(size_t r, T& mult);
@@ -83,6 +83,11 @@ class Ultimatrix{
         void setToIdentity();
         void setToZero();
         
+
+        Ultimatrix<T> transpose();
+        Ultimatrix<T> symmetric();
+        Ultimatrix<T> skewSymmetric();
+        Ultimatrix<T> invert();
 
         // perhaps we could also define an operator to provide indexing operations
 
@@ -492,6 +497,56 @@ size_t Ultimatrix<T>::findPivot(size_t rs, size_t re, size_t loc){
         if((this->data)[i*nCols + loc] != static_cast<T>(0.0)) return i;
     }
     return -1;
+}
+
+
+
+template<class T>
+Ultimatrix<T> Ultimatrix<T>::transpose(){
+    // returns the transpose of the matrix;
+    Ultimatrix<T> t(this->nCols, this->nRows);
+    int rows = this->nRows;
+    int cols = this->nCols;
+    for(int i = 0; i < rows; i++){
+        for(int j = 0; j < cols; j++){
+            t.setElement(j, i, (this->data)[i*rows + j]);
+        }
+    }
+    return t;
+}
+
+template <class T>
+Ultimatrix<T> Ultimatrix<T>::symmetric(){
+    if(this->nRows != this->nCols) throw error_t(1); // bakchodi, I have no idea what this does, so don't write errant code
+    int rows = this->nRows;
+    int cols = this->nCols;
+    
+    Ultimatrix<T> sym(rows, cols);
+    for(int i = 0; i < rows; i++){
+        for(int j = 0; j < cols; j++){
+            T t = ((this->data)[i*cols + j] + (this->data)[j*cols + i])/(static_cast<T>(2.0));
+            (sym.data)[i*cols + j] = t;
+            (sym.data)[j*cols + i] = t;
+        }
+    }
+    return sym;
+}
+
+template <class T>
+Ultimatrix<T> Ultimatrix<T>::skewSymmetric(){
+    if(this->nRows != this->nCols) throw error_t(1); // bakchodi, I have no idea what this does, so don't write errant code
+    int rows = this->nRows;
+    int cols = this->nCols;
+    
+    Ultimatrix<T> ssym(rows, cols);
+    for(int i = 0; i < rows; i++){
+        for(int j = 0; j < cols; j++){
+            T t = ((this->data)[i*cols + j] - (this->data)[j*cols + i])/(static_cast<T>(2.0));
+            (ssym.data)[i*cols + j] = t;
+            (ssym.data)[j*cols + i] = -t;
+        }
+    }
+    return ssym;
 }
 
 
