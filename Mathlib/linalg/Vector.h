@@ -1,5 +1,6 @@
 #include "./Ultimatrix.h"
 #include <bits/stdc++.h>
+#include <math.h>
 
 #ifndef xlr8
 #define xlr8
@@ -33,9 +34,17 @@ class Vector: private Ultimatrix{
     // addition, subtraction and multiplication are covered in matrix mult
     // element wise multiplication is also covered by the ultimatrix implementation
 
-    template<class U> friend Vector<U> operator X(Vector<U> &lhs, Vector <U> &rhs); // evaluate vector cross product
-    template<class U> friend Vector<U> operator*(Vector<U> &v1, Vector<U>& v2); // evaluate vector dot product 
+
+    template<class U> friend Vector<U> operator=(Vector)
+    template<class U> friend U operator*(Vector<U> &v1, Vector<U>& v2); // evaluate vector dot product 
+    template<class U> friend U operator*(U factor, Vector<U> &v); // scale by a constant factor
+    template<class U> friend Vector<U> cross(Vector<U> &lhs, Vector <U> &rhs); // evaluate vector cross product
     template<class U> friend Vector<U> goldsteinRotation(Vector<U> &axis, Vector <U> &vector, U theta); // evaluate rotation along a given axis
+    template<class U> friend Vector<U> project(Vector<U> &target, Vector<U> &space);
+    
+    
+    T magnitude();
+    void scale(T value);
 };
 
 /*
@@ -112,11 +121,86 @@ Vector<T>::Vector(Vector<T>* v){
     for(int i = 0; i < v->nRows; i++) (this->data)[i] = (v->data)[i];
 }
 
+
+template <class T>
+T operator*(Vector<T> &V, Vector <T> &Y){
+    //evaluates v.y
+    assert(V.nRows == Y.nCols);
+    T acc = static_cast<T>(0.0);
+    for(size_t i = 0; i < V.nRows; i++){
+        acc += ((V.data)[i])*((Y.data)[i]);
+    }
+    return acc;
+}
+
+template <class T>
+Vector <T> cross(Vector <T> &a, Vector <T> &b){
+    assert(a.nRows == b.nRows);
+    assert(a.nRows == 3);
+    T c1 = ((a.data)[1])*((b.data)[2]) - ((a.data)[2])*((b.data)[1]);
+    T c2 = ((a.data)[2])*((b.data)[0]) - ((a.data)[0])*((b.data)[2]);
+    T c3 = ((a.data)[0])*((b.data)[1]) - ((a.data)[1])*((b.data)[0]);
+    Vector <T> product(a.nRows);
+    (product.data)[0] = c1;
+    (product.data)[1] = c2;
+    (product.data)[2] = c3;    
+    return product;
+}
+
+
+template <class T>
+Vector<T> project(Vector<T> &v, Vector<T> &y){
+    // uses (vTy/yTy)*a
+    // projects v onto y
+    T mag = y.magnitude();
+    T dot = v*y;
+    T coefficient = mag*dot;
+    Vector<T> projection(y.nRows); 
+    for(size_t i = 0; i < y.nRows; i++){
+        (projection.data)[i] = coefficient*((y.data)[i]);
+    }
+}
+
+
+template <class T>
+T Vector<T>::magnitude(){
+    T acc = static_cast<T> (0.0);
+    for(size_t i = 0; i < this->nRows; i++){
+        acc += ((this->data)[i])*((this->data)[i]);
+    }
+    return acc;
+}
+
+template <class T>
+void Vector<T>::scale(T value){
+    for(size_t i = 0; i < this->nRows; i++){
+        (this->data)[i] *= value;
+    }
+    return;
+}
+
+
 template <class T>
 Vector <T> goldsteinRotation(Vector <T>& axis, Vector <T>& vector, T theta){
     // make sure the axis and vector are of the same dimension 
     assert(axis.nRows == vector.nRows);
+    size_t rowCount = axis.nRows;
+    T coeff1 = math.cos(theta);  
+    T coeff2 = math.sin(theta); 
+    T coeff3 = ((axis*vector)/axis.magnitude());
+    Vector <T> auxilliary = project(vector, axis);
+    Vector <T> error = vector - auxilliary;
+    Vector <T> crossProduct = cross(auxilliary, error);
+    error.scale(coeff1);
+    crossProduct.scale(coeff2);
+    Vector <T> ans = error + crossProduct;
+    return ans;
 }
+
+
+
+
+
 
 
 // unfamiliar with my own matrix library!

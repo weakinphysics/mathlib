@@ -45,7 +45,7 @@ class Ultimatrix{
         ~Ultimatrix(); // destructor
 
         bool operator== (const Ultimatrix<T>& rhs); // declare the comparision operator and provide a value to test against, rhs
-        T& operator[] (size_t index); // array indexing operation 
+        // virtual T& operator[] (size_t index); // array indexing operation 
 
         template <class U> friend Ultimatrix<U> operator+ ( Ultimatrix<U>& lhs,  Ultimatrix<U>& rhs); // add two matrices
         template <class U> friend Ultimatrix<U> operator+ ( U lhs,  Ultimatrix<U> &rhs); // add a Ultimatrix to a scalar
@@ -82,13 +82,13 @@ class Ultimatrix{
         bool resize(size_t row, size_t col, T value);
         void setToIdentity();
         void setToZero();
-        
-
+        void elementaryRowOperation(size_t row1, size_t row2, T factor);
+        void elementaryRowOperation(size_t row1, size_t row2, size_t colStart, size_t colEnd, T factor);
         Ultimatrix<T> transpose();
         Ultimatrix<T> symmetric();
         Ultimatrix<T> skewSymmetric();
         Ultimatrix<T> invert();
-
+        Ultimatrix<T> rref();
         // perhaps we could also define an operator to provide indexing operations
 
 };
@@ -139,6 +139,7 @@ Ultimatrix<T>::Ultimatrix(size_t rows, size_t cols, const T* inputvector){
     this->isInvertible = -1;
     for(int i = 0; i < (rows*cols); i++) (this->data)[i] = inputvector[i];
 }
+
 
 template <class T>
 Ultimatrix<T>::Ultimatrix(Ultimatrix<T>&m){
@@ -551,16 +552,38 @@ Ultimatrix<T> Ultimatrix<T>::skewSymmetric(){
 
 
 template <class T>
+void Ultimatrix<T>::elementaryRowOperation(size_t row1, size_t row2, T factor){
+    size_t cols = this->nCols;
+    for(size_t i = 0; i < cols; i++){
+        (this->data)[row1*cols + i] += factor*(this->data)[row2*cols + i];
+    }
+    return;
+}
+
+template <class T>
+void Ultimatrix<T>::elementaryRowOperation(size_t row1, size_t row2, size_t colStart, size_t colEnd, T factor){
+    size_t cols = this->nCols;
+    for(size_t i = colStart; i <= colEnd; i++){
+        (this->data)[row1*cols + i] += factor*((this->data)[row2*cols + i]);
+    }
+    return;
+}
+
+
+template <class T>
 Ultimatrix<T> Ultimatrix<T>::invert(){
 
     // this is a simple function that performs a Ultimatrix inversion
     // if at any point, we have a breakdown of elimination, we terminate and raise an error
+
     Ultimatrix<T> inverse(this->nRows, this->nCols);
     if(this->nRows != this->nCols){
         this->isInvertible = false;
         return inverse;
     }
 
+
+    std::stack <std::pair<T ,std::pair<std::pair<int, int>, std::pair<int, int>>>> operations;
     Ultimatrix<T> temp(this);
     Ultimatrix<T> L(this);
     inverse.setToIdentity();
@@ -593,10 +616,18 @@ Ultimatrix<T> Ultimatrix<T>::invert(){
         }
         for(int j = i + 1; j < rows; j++){
             T multiplier = ((temp.data)[j*cols + i])/p;
-            for(int k = 0; k <= i; k++){
-                // create the Linverse
-                (L.data)[j*cols + k] -= multiplier*((L.data)[i*cols + k]);
-            } 
+            std::pair<int, int> rs = {j, i};
+            std::pair<int, int> cs = {0, i};
+            std::pair<T, std::pair<std::pair<int, int>, std::pair<int, int>>> p;
+            p.first = multiplier;
+            p.second.first = rs;
+            p.second.second = cs;
+            operations.push(p);
+            // for(int k = 0; k <= i; k++){
+            //     // create the Linverse
+            //     (L.data)[j*cols + k] -= multiplier*((L.data)[i*cols + k]);
+            
+            // } 
             for(int k = 0; k < cols; k++){
                 (temp.data)[j*cols + k] -= ((temp.data)[i*cols + k])*multiplier;
                 if(abs((temp.data)[j*cols+ k]) < static_cast<T>(1e-9)) (temp.data)[j*cols + k] = static_cast<T>(0.0); // resolve floating point errors
@@ -605,16 +636,14 @@ Ultimatrix<T> Ultimatrix<T>::invert(){
             }
         }
         
-        L.printUltimatrix();
         // At this point standard Gaussian elimination is complete, and the resultant temp Ultimatrix can be used for solution of linear systems using back subst
     }
-
     // Now let us reduce the upper triangular Ultimatrix to the identity Ultimatrix 
-    for(int i = 0; i < rows; i++){
-        for(int j = 0; j < i; j++){
-            (L.data)[i*cols + j] *= static_cast<T>(-1.00);
-        }
-    }
+    // for(int i = 0; i < rows; i++){
+    //     for(int j = 0; j < i; j++){
+    //         (L.data)[i*cols + j] *= static_cast<T>(-1.00);
+    //     }
+    // }
 
     // the LU decomposition is now complete
     Ultimatrix<T> U(temp);
@@ -639,13 +668,35 @@ Ultimatrix<T> Ultimatrix<T>::invert(){
         (inverse.data)[i*cols + i] /= (temp.data)[i*cols + i];
         (temp.data)[i*cols + i] = 1;
     }
+    // let us create the L matrix from the stack operations stored so far
+    while(!operations.empty()){
+        T one = operations.top().first;
+        int two = operations.top().second.first.first;
+        int three = operations.top().second.first.second;
+        int four = operations.top().second.second.first;
+        int five = operations.top().second.second.second;
+        // std::cout<<two<<" "<<three<<" "<<four<<" "<<five<<" T: "<<one<<std::endl;
+        operations.pop();
 
+        // ELEMENTARY ROW OPERATIONS
+        T modified = one;
+        L.elementaryRowOperation(two, three, four, five, one);
+
+    }
     // At this point the Ultimatrix has been successfully inverted.
-    L.printUltimatrix();
-    U.printUltimatrix();
+    L.printMatrix();
+    U.printMatrix();
 
     return inverse;
 }
+
+
+template <class T>
+Ultimatrix<T> Ultimatrix<T>::rref(){
+    return this;
+}
+
+
 
 template <class T>
 void Ultimatrix<T>::scaleRow(size_t row, T& mult){
