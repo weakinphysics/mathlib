@@ -16,7 +16,10 @@ int main(){
     e.setElement(1, 2, 2.00);
     e.setElement(2, 1, 2.00);
     e.setElement(2, 2, 3.00);    
-    Ultimatrix<double> inv = e.invert();
-    inv.printMatrix();
+    // Ultimatrix<double> inv = e.invert();
+    vector<Ultimatrix<double>> qr = e.qrf();
+    qr[0].printMatrix();
+    qr[1].printMatrix();
+    // inv.printMatrix();
     return 0;
 }

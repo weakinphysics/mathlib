@@ -3,10 +3,12 @@
 #endif 
 
 #include <bits/stdc++.h>
+#include <math.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <iostream>
+#include <iomanip>
 
 
 // it does not have to be the most efficient implementation
@@ -33,6 +35,7 @@ class Ultimatrix{
         bool isSymmetric;
         bool isAntisymmetric;
         bool isVector;
+        bool isOrthogonal;
 
     public:
         // constructors
@@ -44,8 +47,9 @@ class Ultimatrix{
 
         ~Ultimatrix(); // destructor
 
-        bool operator== (const Ultimatrix<T>& rhs); // declare the comparision operator and provide a value to test against, rhs
+        bool operator== (Ultimatrix<T>& rhs); // declare the comparision operator and provide a value to test against, rhs
         // virtual T& operator[] (size_t index); // array indexing operation 
+        void operator= (Ultimatrix<T>& rhs);
 
         template <class U> friend Ultimatrix<U> operator+ ( Ultimatrix<U>& lhs,  Ultimatrix<U>& rhs); // add two matrices
         template <class U> friend Ultimatrix<U> operator+ ( U lhs,  Ultimatrix<U> &rhs); // add a Ultimatrix to a scalar
@@ -58,6 +62,7 @@ class Ultimatrix{
         template <class U> friend Ultimatrix<U> operator* ( Ultimatrix<U>& lhs,  Ultimatrix<U>& rhs); // multiply two matrices
         template <class U> friend Ultimatrix<U> operator* ( U lhs,  Ultimatrix<U> &rhs); // linearly scale a Ultimatrix
         template <class U> friend Ultimatrix<U> operator* ( Ultimatrix<U> &lhs,  U rhs); // ??
+
         
         
         // template <class U> friend std::ostream& operator<<(ostream& os,  Ultimatrix<U> &output); // print Ultimatrix
@@ -84,6 +89,11 @@ class Ultimatrix{
         void setToZero();
         void elementaryRowOperation(size_t row1, size_t row2, T factor);
         void elementaryRowOperation(size_t row1, size_t row2, size_t colStart, size_t colEnd, T factor);
+
+        T columnVectorMagnitude(size_t col);
+
+        std::vector<Ultimatrix<T>> qrf();
+
         Ultimatrix<T> transpose();
         Ultimatrix<T> symmetric();
         Ultimatrix<T> skewSymmetric();
@@ -332,11 +342,23 @@ void Ultimatrix<T>::setToIdentity(){
 
 
 template <class T>
-bool Ultimatrix<T>::operator== (const Ultimatrix <T> &rhs){
+bool Ultimatrix<T>::operator== (Ultimatrix <T> &rhs){
     if(this->nRows != rhs.nRows) return false;
     if(this->nCols != rhs.nCols) return false;
     for(int i = 0; i < rhs.nElements; i++) if((this->data)[i] != (rhs.data)[i]) return false;
     return true;
+}
+
+template <class T>
+void Ultimatrix<T>::operator= (Ultimatrix<T> &rhs){
+    this->nRows = rhs.getNumRows();
+    this->nCols = rhs.getNumCols();
+    this->nElements = rhs.getNumElements();
+    delete this->data;
+    this->data = new T[rhs.getNumElements()];
+    this->isInvertible = -1;
+    for(int i = 0; i < this->nElements; i++) (this->data)[i] = rhs.getElement(i);
+    return;
 }
 
 // template <class T>
@@ -569,6 +591,29 @@ void Ultimatrix<T>::elementaryRowOperation(size_t row1, size_t row2, size_t colS
     return;
 }
 
+template <class T>
+T Ultimatrix<T>::columnVectorMagnitude(size_t col){
+    T acc = 0;
+    size_t rows = this->nRows;
+    size_t cols = this->nCols;
+    for(size_t i = 0; i < rows; i++){
+        acc += ((this->data)[i*cols + col])*((this->data)[i*cols + col]);
+    }
+    acc = sqrt(acc);
+    return acc;
+}
+
+
+template <class T>
+void Ultimatrix<T>::scaleRow(size_t row, T& mult){
+    // function to scale a row by a certain amount 
+    int cols = this->nCols;
+    for(int i = 0; i < cols; i++){
+        (this->data)[row*cols + i] *= mult;
+    }
+    return;
+}
+
 
 template <class T>
 Ultimatrix<T> Ultimatrix<T>::invert(){
@@ -691,22 +736,62 @@ Ultimatrix<T> Ultimatrix<T>::invert(){
 }
 
 
+
+
 template <class T>
 Ultimatrix<T> Ultimatrix<T>::rref(){
+    // row rank = column rank
+    // size_t minDimension = min(this->nRows, this->nCols);
+    
     return this;
 }
 
-
-
 template <class T>
-void Ultimatrix<T>::scaleRow(size_t row, T& mult){
-    // function to scale a row by a certain amount 
-    int cols = this->nCols;
-    for(int i = 0; i < cols; i++){
-        (this->data)[row*cols + i] *= mult;
+std::vector<Ultimatrix <T>> Ultimatrix<T>::qrf(){
+    // calculate the dot product per element
+    size_t rows = this->nRows;
+    size_t cols = this->nCols;
+    Ultimatrix <T> Q(rows, cols);
+    Ultimatrix <T> R(rows, cols); // to obtain the R values
+    // repeatedly perform Gram-schmidt orthogonalization
+    T magnitude = static_cast<T>(0.0); // static cast is safer because it has more compile time checks
+    std::vector <T> copy(rows, magnitude);
+    for(size_t i = 0; i < cols; i++){
+        for(size_t j = 0; j < rows; j++) copy[j] = (this->data)[j*cols + i];
+        for(size_t j = 0; j < i; j++){
+            T dot = static_cast<T>(0.0);
+            for(size_t k = 0; k < rows; k++) dot += (this->data[k*cols + i])*(Q.data[k*cols + j]); // calculating the dot product
+            for(size_t k = 0; k < rows; k++){
+                copy[k] -= dot*((Q.data)[k*cols + j]);
+            } // remove component along qj direction
+            (R.data)[j*cols + i] = dot;
+        }
+        magnitude = static_cast<T>(0.0);
+        for(size_t j = 0; j < rows; j++) magnitude += (copy[j]*copy[j]);
+        magnitude = sqrt(magnitude);
+
+        for(size_t j = 0; j < rows; j++) copy[j] /= magnitude;
+        for(size_t j = 0; j < rows; j++) (Q.data)[j*cols + i] = copy[j];
+        (R.data)[i*cols + i] = magnitude;
     }
-    return;
+    // Q.printMatrix();
+    // R.printMatrix();
+    for(size_t i = 0; i < rows; i++){
+        for(size_t j = 0; j < cols; j++){
+            if(abs((Q.data)[i*cols+ j]) < static_cast<T>(1e-9)) (Q.data)[i*cols + j] = static_cast<T>(0.0);
+            if(abs((R.data)[i*cols+ j]) < static_cast<T>(1e-9)) (R.data)[i*cols + j] = static_cast<T>(0.0);
+        }
+    }
+    std::vector <Ultimatrix<T>> factorization(2);
+    factorization[0] = Q;
+    factorization[1] = R;
+    return factorization; // auto-memory managed
+
 }
+
+
+
+
 
 
 

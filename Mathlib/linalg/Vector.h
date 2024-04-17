@@ -195,7 +195,11 @@ Vector <T> goldsteinRotation(Vector <T>& axis, Vector <T>& vector, T theta){
     crossProduct.scale(coeff2);
     Vector <T> ans = error + crossProduct;
     return ans;
+
 }
+
+// template <class T>
+// Vector<T> 
 
 
 
